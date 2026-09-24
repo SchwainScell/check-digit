@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISO 6346 Container Check Digit Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        
+        /* Custom animation for the result card */
+        @keyframes slideUpFade {
+            0% {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-result {
+            animation: slideUpFade 0.4s ease-out forwards;
+        }
+
+        /* Container Number styling */
+        .digit-box {
+            display: inline-block;
+            border: 2px solid #0f172a;
+            border-radius: 6px;
+            padding: 2px 8px;
+            margin-left: 6px;
+            font-weight: 800;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-800 to-blue-900 text-slate-800">
+
+    <!-- Main Card Container -->
+    <div class="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
+        
+        <!-- Header -->
+        <div class="bg-slate-50 border-b border-slate-100 p-6 text-center">
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Check Digit Calculator</h1>
+            <p class="text-sm text-slate-500 mt-2">ISO 6346 Standard</p>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <form id="calculatorForm" class="space-y-6" onsubmit="event.preventDefault(); calculate();">
+                
+                <!-- Input Group -->
+                <div>
+                    <label for="containerInput" class="block text-sm font-semibold text-slate-700 mb-2">
+                        Container Prefix & Serial
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="containerInput" 
+                            class="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all uppercase font-mono text-lg tracking-wider placeholder-slate-400"
+                            placeholder="e.g. CSQU305438"
+                            autocomplete="off"
+                            spellcheck="false"
+                            maxlength="12"
+                        >
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Format: 4 letters followed by 6 digits.</p>
+                    
+                    <!-- Error Message -->
+                    <div id="errorMessage" class="hidden mt-2 text-sm text-red-600 bg-red-50 p-2 rounded-md border border-red-100 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        <span id="errorText">Invalid format.</span>
+                    </div>
+                </div>
+
+                <!-- Calculate Button -->
+                <button 
+                    type="submit" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 active:transform active:scale-95 flex justify-center items-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                    </svg>
+                    Calculate Check Digit
+                </button>
+            </form>
+
+            <!-- Result Display Area (Hidden initially) -->
+            <div id="resultContainer" class="hidden mt-8 pt-6 border-t border-slate-100">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 text-center">Full Container Number</h3>
+                <div class="bg-slate-100 p-4 rounded-xl text-center shadow-inner">
+                    <div id="finalNumber" class="text-3xl font-mono text-slate-800 tracking-widest flex items-center justify-center">
+                        <!-- Content injected via JS -->
+                    </div>
+                </div>
+                
+                <div class="mt-4 grid grid-cols-2 gap-4 text-center">
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <div class="text-xs text-blue-600 font-semibold mb-1">Calculation Sum</div>
+                        <div id="calcSum" class="font-mono text-lg text-slate-700">0</div>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <div class="text-xs text-blue-600 font-semibold mb-1">Check Digit</div>
+                        <div id="calcDigit" class="font-mono text-lg font-bold text-slate-900">0</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // ISO 6346 Letter equivalents (skipping multiples of 11: 11, 22, 33)
+        const letterValues = {
+            'A': 10, 'B': 12, 'C': 13, 'D': 14, 'E': 15, 'F': 16, 'G': 17, 'H': 18, 'I': 19, 'J': 20,
+            'K': 21, 'L': 23, 'M': 24, 'N': 25, 'O': 26, 'P': 27, 'Q': 28, 'R': 29, 'S': 30, 'T': 31,
+            'U': 32, 'V': 34, 'W': 35, 'X': 36, 'Y': 37, 'Z': 38
+        };
+
+        const containerInput = document.getElementById('containerInput');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const resultContainer = document.getElementById('resultContainer');
+        const finalNumber = document.getElementById('finalNumber');
+        const calcSumDisplay = document.getElementById('calcSum');
+        const calcDigitDisplay = document.getElementById('calcDigit');
+
+        // Input formatter - forces uppercase and removes invalid characters dynamically
+        containerInput.addEventListener('input', function(e) {
+            // Remove non-alphanumeric characters and spaces
+            let val = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            
+            // Limit to 10 characters
+            if (val.length > 10) {
+                val = val.substring(0, 10);
+            }
+            this.value = val;
+            
+            // Hide error & result on new input
+            errorMessage.classList.add('hidden');
+            resultContainer.classList.add('hidden');
+            resultContainer.classList.remove('animate-result');
+        });
+
+        // Main Calculation Function
+        function calculate() {
+            const inputVal = containerInput.value;
+
+            // Validation: Must be exactly 10 characters, 4 letters, then 6 digits
+            const regex = /^[A-Z]{4}\d{6}$/;
+            
+            if (inputVal.length === 0) {
+                showError("Please enter a container number.");
+                return;
+            }
+            
+            if (inputVal.length !== 10) {
+                showError(`Input must be exactly 10 characters. (Current length: ${inputVal.length})`);
+                return;
+            }
+
+            if (!regex.test(inputVal)) {
+                showError("Format must be 4 letters followed by 6 digits (e.g., CSQU305438).");
+                return;
+            }
+
+            // ISO 6346 Calculation
+            let sum = 0;
+            
+            for (let i = 0; i < 10; i++) {
+                const char = inputVal[i];
+                let numericValue;
+                
+                // Get numeric equivalent
+                if (i < 4) { // First 4 are letters
+                    numericValue = letterValues[char];
+                } else { // Next 6 are numbers
+                    numericValue = parseInt(char, 10);
+                }
+
+                // Weight is 2^i
+                const weight = Math.pow(2, i);
+                
+                sum += (numericValue * weight);
+            }
+
+            // Calculate Check Digit
+            let remainder = sum % 11;
+            // If remainder is 10, check digit is 0
+            let checkDigit = (remainder === 10) ? 0 : remainder;
+
+            // Display Results
+            const prefix = inputVal.substring(0, 4);
+            const serial = inputVal.substring(4, 10);
+
+            // Construct visual container string
+            finalNumber.innerHTML = `
+                <span class="text-blue-700">${prefix}</span> 
+                <span class="ml-2 text-slate-800">${serial}</span> 
+                <span class="digit-box bg-white text-slate-900 border-slate-800 shadow-sm">
+                    ${checkDigit}
+                </span>
+            `;
+
+            calcSumDisplay.textContent = sum.toLocaleString();
+            calcDigitDisplay.textContent = checkDigit;
+
+            // Hide error if present
+            errorMessage.classList.add('hidden');
+            
+            // Show result with animation
+            resultContainer.classList.remove('hidden');
+            // Trigger reflow to restart animation
+            void resultContainer.offsetWidth; 
+            resultContainer.classList.add('animate-result');
+            
+            // Optional: Blur input on mobile to hide keyboard after calc
+            containerInput.blur();
+        }
+
+        // Helper to show errors
+        function showError(msg) {
+            errorText.textContent = msg;
+            errorMessage.classList.remove('hidden');
+            resultContainer.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
